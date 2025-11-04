@@ -1,0 +1,23 @@
+services:
+  slicer:
+    build:
+      context: .
+    image: image_slicer:latest
+    env_file:
+      - .env
+    volumes:
+      - ${SLICER_DATA_ROOT}:/data:ro
+      - ${SLICER_OUT_ROOT}:/out
+      - ${ANNOTATIONS_HOST_PATH}:/ann:ro
+    command: >
+      --root /data
+      --images-subdir ${SLICER_IMAGES_SUBDIR:-images}
+      --labelstudio-json ${SLICER_LS_JSON:-/ann/labelstudio.json}
+      --out /out
+      --slice-size ${SLICER_SLICE_SIZE:-1024}
+      --overlap ${SLICER_OVERLAP:-0.20}
+      --min-visible ${SLICER_MIN_VISIBLE:-0.20}
+      --drop-tiny ${SLICER_DROP_TINY:-4}
+      --keep-negatives
+      --ls-url ${PUBLIC_URL}
+      --ls-root ${LS_ROOT}

@@ -18,6 +18,5 @@ services:
       --overlap ${SLICER_OVERLAP:-0.20}
       --min-visible ${SLICER_MIN_VISIBLE:-0.20}
       --drop-tiny ${SLICER_DROP_TINY:-4}
-      --keep-negatives
       --ls-url ${PUBLIC_URL}
       --ls-root ${LS_ROOT}

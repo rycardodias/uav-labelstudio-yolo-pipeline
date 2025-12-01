@@ -1,0 +1,4 @@
+mydata
+.env
+models/*
+!models/.gitkeep

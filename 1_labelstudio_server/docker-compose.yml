@@ -19,7 +19,7 @@ services:
     command: ["label-studio", "start", "--host", "0.0.0.0", "--port", "8080"]
     volumes:
       # Persist Label Studio internal data (DB, uploads, configs)
-      - ./mydata:/label-studio/data
+      - ${LABEL_STUDIO_DATA_PATH}:/label-studio/data
       # Mount your image repository read-only inside the container
       # NOTE: Windows path on the left side:
       - ${HOST_REPOSITORY_PATH}:/label-studio/files/pampas_repository:ro

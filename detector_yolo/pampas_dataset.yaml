@@ -1,0 +1,5 @@
+path: /data          # dentro do container (mapeado abaixo)
+train: images         # subpasta com imagens de treino
+val: images           # usar as mesmas se ainda não tens split
+names:
+  0: pampas

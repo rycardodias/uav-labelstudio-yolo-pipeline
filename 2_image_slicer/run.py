@@ -109,10 +109,11 @@ def main():
     ap.add_argument("--root", type=str, required=True, help="Root dir containing images")
     ap.add_argument("--images-subdir", dest="images_subdir", type=str, default="images",
                     help="Subfolder with images relative to --root (use '.' if images are directly under root)")
-    ap.add_argument("--labelstudio-json", type=str, required=True,
-                    help="Path to the Label Studio export JSON (container path)")
+    ap.add_argument("--labelstudio-json", type=str, default=None,
+                help="Path to the Label Studio export JSON (container path)")
     ap.add_argument("--out", type=str, required=True, help="Output directory")
-    ap.add_argument("--slice-size", type=int, default=1024)
+    ap.add_argument("--slice-size", type=int, default=640)
+    ap.add_argument("--slice-drop-small", type=int, default=1)
     ap.add_argument("--overlap", type=float, default=0.20, help="0.0..0.9 (fraction of tile size)")
     ap.add_argument("--min-visible", dest="min_visible", type=float, default=0.20,
                     help="Min visible fraction of original bbox kept on a tile")
@@ -123,6 +124,11 @@ def main():
     
     ap.add_argument("--ls-url", type=str, default="http://localhost:8080", help="Base URL of Label Studio (scheme+host). Ex: http://localhost:8080")
     ap.add_argument("--ls-root", type=str, default="pampas_repository/_slices", help="Path under /label-studio/files that maps to your OUT dir, e.g. pampas_repository/_slices")
+    ap.add_argument("--unlabeled", action="store_true", help="Slice images without annotations (for test/inference datasets)"
+)
+    if not args.unlabeled and not args.labelstudio_json:
+        ap.error("--labelstudio-json is required unless --unlabeled is used")
+
     args = ap.parse_args()
 
     root = Path(args.root)
@@ -132,9 +138,19 @@ def main():
 
     ensure_dir(out_root)
     ensure_dir(img_out)
+    
+    
 
-    ann_map = load_labelstudio(Path(args.labelstudio_json), images_dir)
-    files = list(ann_map.keys())
+    if args.unlabeled:
+        ann_map = {}
+    else:
+        ann_map = load_labelstudio(Path(args.labelstudio_json), images_dir)
+        
+    if args.unlabeled:
+        files = [p.name for p in images_dir.iterdir() if p.suffix.lower() in {".jpg", ".jpeg", ".png"}]
+    else:
+        files = list(ann_map.keys())
+
 
     step = max(1, int(args.slice_size * (1.0 - args.overlap)))
     ls_tasks = []
@@ -153,9 +169,10 @@ def main():
             W, H = im.width, im.height
             # absolute boxes
             abs_anns = []
-            for a in ann_map.get(fname, {}).get("anns", []):
-                x, y, w, h = a["xywh_norm"]
-                abs_anns.append({"cls": a["cls"], "xywh": (x * W, y * H, w * W, h * H)})
+            if not args.unlabeled:
+                for a in ann_map.get(fname, {}).get("anns", []):
+                    x, y, w, h = a["xywh_norm"]
+                    abs_anns.append({"cls": a["cls"], "xywh": (x * W, y * H, w * W, h * H)})
 
             y0 = 0
             while y0 < H:
@@ -163,7 +180,12 @@ def main():
                 tile_h = min(args.slice_size, H - y0)
                 while x0 < W:
                     tile_w = min(args.slice_size, W - x0)
-
+                    
+                    # Skip tiles smaller than slice-size
+                    if args.slice_drop_small == 1 and (tile_w < args.slice_size or tile_h < args.slice_size):
+                        x0 += step if x0 + step < W else W
+                        continue
+                    
                     crop = im.crop((x0, y0, x0 + tile_w, y0 + tile_h))
                     stem = Path(fname).stem
                     tile_name = f"{stem}_x{x0}_y{y0}.jpg"
@@ -199,21 +221,33 @@ def main():
                             "origin": "manual"
                         })
 
-                    if results or args.keep_negatives:
-                        web_path = f"{args.ls_root}/{tile_name}"
-                        full_url = f"{args.ls_url}/data/local-files/?d={web_path}"
+                    web_path = f"{args.ls_root}/{tile_name}"
+                    full_url = f"{args.ls_url}/data/local-files/?d={web_path}"
+
+                    if args.unlabeled:
+                        # Optional: still generate LS tasks for inference/visual review
+                        ls_tasks.append({
+                            "data": {"image": full_url},
+                            "annotations": []
+                        })
+                        total_tiles += 1
+
+                    elif results or args.keep_negatives:
                         ls_tasks.append({
                             "data": {"image": full_url},
                             "annotations": [{"result": results}]
                         })
                         total_tiles += 1
 
+
                     x0 += step if x0 + step < W else W
                 y0 += step if y0 + step < H else H
 
     out_json = out_root / "labelstudio_tiles.json"
-    with open(out_json, "w", encoding="utf-8") as f:
-        json.dump(ls_tasks, f, ensure_ascii=False)
+    
+    if not args.unlabeled:
+        with open(out_json, "w", encoding="utf-8") as f:
+            json.dump(ls_tasks, f, ensure_ascii=False)
 
     print("\n=== Summary ===")
     print(f"Tiles saved: {total_tiles}")

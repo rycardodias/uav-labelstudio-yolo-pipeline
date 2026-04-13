@@ -4,17 +4,20 @@ from shutil import copy2
 from random import Random
 
 # ==== CONFIGURAÇÕES ====
-group = "005"
+group = "001"
 # Caminho do ficheiro JSON exportado do Label Studio
-labelstudio_json = Path(fr"P:\temporaryFiles\labelstudio_tiles.json")
+# labelstudio_json = Path(fr"P:\pampas_repository_groups\group_{group}_labels.json")
 # labelstudio_json = Path(fr"P:\temporaryFiles\_slices_{group}\labelstudio_tiles.json")
+labelstudio_json = Path(fr"P:\temporaryFiles\_slices_all_minus_006\labelstudio_tiles.json")
 
 # Pasta onde estão as imagens originais usadas no Label Studio
-source_images = Path(fr"P:\temporaryFiles\group_{group}")
+# source_images = Path(fr"P:\pampas_repository_groups\group_{group}")
 # source_images = Path(fr"P:\temporaryFiles\_slices_{group}")
+source_images = Path(fr"P:\temporaryFiles\_slices_all_minus_006")
 
 # Pasta raiz do novo dataset YOLO
-output_root = Path(fr"P:\temporaryFiles\group_{group}_yolo")
+# output_root = Path(fr"P:\temporaryFiles\group_{group}_yolo")
+output_root = Path(fr"P:\temporaryFiles\_slices_all_minus_006_yolo")
 output_images = output_root / "images"
 output_labels = output_root / "labels"
 
@@ -124,8 +127,31 @@ def main():
 
     print(f"[INFO] Amostras com anotação: {n}")
     ensure_dirs()
+    
+    print("\n[INFO] A copiar imagens sem anotação...")
 
-    # Split 70/20/10
+    unlabeled_dir = output_root / "images_without_annotation"
+    unlabeled_dir.mkdir(parents=True, exist_ok=True)
+
+    annotated_names = {image_name for _, image_name, _ in records}
+
+    all_images = (
+        list(source_images.glob("*.jpg")) +
+        list(source_images.glob("*.png")) +
+        list(source_images.glob("*.jpeg"))
+    )
+
+    copied_count = 0
+    for img in all_images:
+        if img.name not in annotated_names:
+            copy2(img, unlabeled_dir / img.name)
+            copied_count += 1
+
+    print(f"[INFO] Imagens SEM anotação copiadas: {copied_count}")
+    print(f"[INFO] Pasta: {unlabeled_dir}")
+    print("====================================================\n")
+
+    # Split
     train_idx, val_idx, test_idx = split_indices(
         n, train_p=train_ratio, val_p=val_ratio, seed=seed
     )

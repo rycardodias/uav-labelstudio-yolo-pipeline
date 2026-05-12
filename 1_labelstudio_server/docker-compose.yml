@@ -1,6 +1,7 @@
 services:
   labelstudio:
     image: heartexlabs/label-studio:latest
+    user: "0:0"
     container_name: labelstudio
     ports:
       - "8080:8080"
@@ -46,6 +47,6 @@ services:
       - LS_TOKEN=${LABEL_STUDIO_USER_TOKEN}
     volumes:
       - ./bootstrap:/bootstrap:ro
-    entrypoint: ["/bin/sh","-c","/bootstrap/bootstrap.sh"]
+    entrypoint: ["/bin/sh","/bootstrap/bootstrap.sh"]
     # Run once and exit
     restart: "no"
